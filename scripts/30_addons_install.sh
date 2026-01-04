@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source .env
+
+kubectl get nodes >/dev/null
+
+render() {
+  envsubst < "$1" > "/tmp/$(basename "$1")"
+  echo "/tmp/$(basename "$1")"
+}
+
+ALB_VALUES=$(render helm/aws-load-balancer-controller/values.yaml)
+EXTERNALDNS_VALUES=$(render helm/external-dns/values.yaml)
+EBS_VALUES=$(render helm/ebs-csi-driver/values.yaml)
+
+helm repo add eks https://aws.github.io/eks-charts
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+helm repo update
+
+kubectl create ns kube-system --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system -f "$ALB_VALUES" --version 1.8.2
+
+helm upgrade --install external-dns eks/external-dns \
+  -n kube-system -f "$EXTERNALDNS_VALUES" --version 1.14.4
+
+helm upgrade --install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver \
+  -n kube-system -f "$EBS_VALUES" --version 2.30.0

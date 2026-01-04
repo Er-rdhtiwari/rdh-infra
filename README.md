@@ -1,1 +1,208 @@
-# rdh-infra
+# Platform Infrastructure Repo (AWS EKS, Jenkins, PoC-ready)
+
+## Why
+- Separate platform infra from PoC repos to avoid blast radius.
+- Scripts + pinned versions reduce drift and onboarding time.
+- IRSA, private nodes, quotas, and HTTPS-first keep PoCs contained.
+
+## Prerequisites
+- CLI tools: `aws` (v2), `terraform` (>=1.6), `kubectl` (>=1.27), `helm` (>=3.13), `jq`, `envsubst`.
+- AWS IAM: ability to create S3, DynamoDB, Route53 hosted zones/records, ACM certs, VPC/EKS/EC2/ELB/IAM.
+- Logged in with credentials for `ap-south-1`.
+- Domain: have ROOT_DOMAIN (e.g., `rdhcloudlab.com`). Subdomain `poc.<ROOT_DOMAIN>` will host PoCs and Jenkins.
+
+## One-time domain setup
+1) If ROOT_DOMAIN in Route53: ensure zone exists.  
+2) Bootstrap (next section) can create `poc.<ROOT_DOMAIN>` hosted zone; copy its NS into ROOT_DOMAIN zone as delegation.
+
+## Flow overview
+1) Bootstrap Terraform backend + (optional) subdomain hosted zone.  
+2) Platform Terraform: VPC, EKS, OIDC/IRSA roles, ACM wildcard cert.  
+3) Helm addons: ALB controller, ExternalDNS, EBS CSI driver.  
+4) Jenkins install in `ci` namespace behind ALB HTTPS.  
+5) PoC onboarding via namespace, quota, Helm chart, ingress host `<id>.poc.<ROOT_DOMAIN>`.
+
+## Environment
+Copy `.env.example` to `.env` and adjust. After `scripts/10_bootstrap_apply.sh`, update `TF_STATE_BUCKET` / `TF_STATE_DYNAMO_TABLE` to match the outputs (bucket is `${NAME_PREFIX}-${ENVIRONMENT}-tf-state`, table is `${NAME_PREFIX}-${ENVIRONMENT}-tf-lock`). After `scripts/20_platform_apply.sh`, copy Terraform outputs (VPC ID, IAM role ARNs, ACM cert ARN) back into `.env` so Helm value rendering works.
+
+## Step-by-step
+### 1) Bootstrap state + subdomain
+```
+scripts/00_prereqs_check.sh
+scripts/10_bootstrap_apply.sh
+```
+- Output: S3 bucket, DynamoDB table, optional hosted zone + NS.
+
+### 2) Deploy platform
+```
+scripts/20_platform_apply.sh
+```
+- Creates VPC, EKS, nodegroup, OIDC, IRSA roles, ACM cert.
+
+### 3) Install addons (ALB, ExternalDNS, EBS CSI)
+```
+scripts/30_addons_install.sh
+```
+
+### 4) Install Jenkins
+```
+scripts/40_jenkins_install.sh
+```
+- Admin creds stored in `jenkins-admin` secret; hostname `jenkins.poc.<ROOT_DOMAIN>` with HTTPS (ALB + ACM).
+
+### 5) Verify
+```
+scripts/50_verify_platform.sh
+```
+
+### 6) Add a PoC
+Example (Helm chart from repo):
+```
+POC_ID=demo1 POC_HELM_REPO=https://example.com/charts \
+POC_HELM_REPO_NAME=demo POC_HELM_CHART=demo/app POC_HELM_VERSION=1.2.3 \
+scripts/60_add_poc.sh
+```
+- Namespace `poc-demo1`, quota/limits applied, ingress host `demo1.poc.<ROOT_DOMAIN>` (ExternalDNS + ALB).
+
+### 7) Destroy
+- Single PoC: `POC_ID=demo1 scripts/95_destroy_poc.sh`
+- Everything: `scripts/90_destroy_all.sh` (uninstalls Jenkins/addons, terraform destroy platform then bootstrap).
+
+## Cost control
+- Nodegroup is single ASG with min=1; adjust to 0 for idle via Terraform var `node_min_size`.
+- Delete idle PoC namespaces via destroy script.
+- Shut down ALBs by removing ingresses if unused.
+- Use `scripts/90_destroy_all.sh` for full teardown.
+
+## Debug checklist highlights
+- State issues: check S3/Dynamo + `terraform state pull`.
+- Cluster access: `aws eks update-kubeconfig --name <cluster>`.
+- ALB/DNS: ensure ALB controller/ExternalDNS pods ready; inspect events.
+- Cert: ACM must be “Issued”; ALB listener uses correct cert ARN.
+
+## Versions
+- Terraform: >=1.6
+- AWS provider: ~> 5.46
+- Helm charts: ALB controller 1.8.2, ExternalDNS 1.14.4, EBS CSI driver 2.30.0, Jenkins 5.6.1
+- EKS Kubernetes version default: 1.28 (override via var)
+
+## Architecture (short)
+- VPC with public subnets for ALB, private subnets for nodes; single NAT for egress.
+- EKS with IRSA enabled; managed nodegroup in private subnets.
+- IAM roles per addon (ALB controller, ExternalDNS, EBS CSI) via IRSA.
+- Route53 hosted zone `poc.<ROOT_DOMAIN>` + wildcard ACM cert `*.poc.<ROOT_DOMAIN>`.
+- Addons via Helm; Jenkins in `ci` namespace with EBS-backed PVC and ALB ingress.
+- PoCs isolated per namespace `poc-<id>` with ResourceQuota + LimitRange, ALB ingress + DNS.
+
+ASCII
+```
+[Admins/laptop]
+   | awscli/terraform/helm/kubectl
+   v
+[S3 tfstate + DynamoDB lock]  <-- bootstrap
+   |
+   v
+[VPC (3AZ) + Public subnets (ALB) + Private subnets (nodes)]
+   |
+   v
+[EKS cluster platform-dev-eks + OIDC]
+   |           |             |
+   |           |             +-- IRSA: EBS CSI driver -> EBS
+   |           +-- IRSA: ALB Controller -> ALB
+   +-- IRSA: ExternalDNS -> Route53 (poc.<ROOT_DOMAIN>)
+   |
+Namespaces: ci (Jenkins PVC via EBS, ingress jenkins.poc.<ROOT_DOMAIN>)
+            poc-<id> (quota+limits, ingress <id>.poc.<ROOT_DOMAIN>)
+```
+
+## Repo tree
+```
+.
+├─ README.md
+├─ .env.example
+├─ Makefile
+├─ scripts/
+│  ├─ 00_prereqs_check.sh
+│  ├─ 10_bootstrap_apply.sh
+│  ├─ 20_platform_apply.sh
+│  ├─ 30_addons_install.sh
+│  ├─ 40_jenkins_install.sh
+│  ├─ 50_verify_platform.sh
+│  ├─ 60_add_poc.sh
+│  ├─ 90_destroy_all.sh
+│  └─ 95_destroy_poc.sh
+├─ bootstrap/
+├─ platform/
+│  └─ policies/
+└─ helm/
+```
+
+## Runbook (commands in order)
+- `cp .env.example .env` and edit values.
+- `scripts/00_prereqs_check.sh`
+- `scripts/10_bootstrap_apply.sh`
+- `scripts/20_platform_apply.sh` (then set VPC_ID, IAM role ARNs, ACM_CERT_ARN in `.env` from outputs)
+- `scripts/30_addons_install.sh`
+- `scripts/40_jenkins_install.sh`
+- `scripts/50_verify_platform.sh`
+- Add PoC: set env vars (POC_ID, POC_HELM_REPO, POC_HELM_REPO_NAME, POC_HELM_CHART, POC_HELM_VERSION) then `scripts/60_add_poc.sh`
+- Destroy PoC: `POC_ID=<id> scripts/95_destroy_poc.sh`
+- Destroy all: `scripts/90_destroy_all.sh`
+
+## Makefile shortcuts
+- `make apply-bootstrap` / `make destroy-bootstrap` run bootstrap with vars from `.env`.
+- `make apply-platform` / `make destroy-platform` create `platform/backend.hcl` from `.env` and run Terraform.
+- `make addons`, `make jenkins`, `make verify`, `make add-poc` wrap the corresponding scripts.
+- `make plan-platform` runs `terraform plan` with all required vars set from `.env`.
+
+## Checkpoints (success, failures, first debug commands)
+1) Tools present  
+   - Success: `scripts/00_prereqs_check.sh` completes.  
+   - Fail: Missing CLI.  
+   - Debug: `which terraform`; `aws sts get-caller-identity`; `terraform version`.
+2) Bootstrap state  
+   - Success: `terraform output` in `bootstrap` shows bucket/table.  
+   - Fail: S3/Dynamo AccessDenied.  
+   - Debug: `aws s3 ls`; `aws dynamodb list-tables`; `terraform state list`.
+3) Subdomain zone delegated  
+   - Success: `dig poc.<ROOT_DOMAIN> NS` returns delegation.  
+   - Fail: ExternalDNS later says “no hosted zone”.  
+   - Debug: `aws route53 list-hosted-zones-by-name --dns-name poc.<ROOT_DOMAIN>`; check NS records in root zone.
+4) Platform apply  
+   - Success: `terraform apply` completes; outputs ARNs.  
+   - Fail: VPC/EKS errors.  
+   - Debug: `terraform plan`; `aws eks describe-cluster --name platform-dev-eks`; `aws ec2 describe-vpcs`.
+5) kubeconfig  
+   - Success: `kubectl get nodes` shows Ready.  
+   - Fail: Unauthorized/timeout.  
+   - Debug: `aws eks update-kubeconfig --name platform-dev-eks --region ap-south-1`; `kubectl config get-contexts`; `kubectl get events -A`.
+6) Addons installed  
+   - Success: `kubectl get pods -n kube-system` shows alb-controller, external-dns, ebs-csi ready.  
+   - Fail: CrashLoop.  
+   - Debug: `kubectl logs -n kube-system deploy/aws-load-balancer-controller`; `kubectl logs -n kube-system deploy/external-dns`; `kubectl describe pod <pod> -n kube-system`.
+7) ACM issued  
+   - Success: `aws acm describe-certificate --certificate-arn <arn> | jq '.Certificate.Status'` -> ISSUED.  
+   - Fail: Pending validation.  
+   - Debug: `aws route53 list-resource-record-sets --hosted-zone-id <poc_zone_id>`; `dig -t CNAME _<...>.poc.<ROOT_DOMAIN>`.
+8) Jenkins ALB  
+   - Success: `kubectl get ingress -n ci` shows ADDRESS; `curl -k https://jenkins.poc.<ROOT_DOMAIN>` returns 403/redirect.  
+   - Fail: ADDRESS empty.  
+   - Debug: `kubectl describe ingress -n ci`; `kubectl get events -n ci`; `kubectl logs -n kube-system deploy/aws-load-balancer-controller`.
+9) DNS records  
+   - Success: `dig jenkins.poc.<ROOT_DOMAIN>` resolves ALB CNAME.  
+   - Fail: NXDOMAIN.  
+   - Debug: `kubectl logs -n kube-system deploy/external-dns`; `aws route53 list-resource-record-sets --hosted-zone-id <poc_zone_id>`; check txtOwnerId matches.
+10) Jenkins PVC  
+   - Success: `kubectl get pvc -n ci` Bound.  
+   - Fail: Pending.  
+   - Debug: `kubectl describe pvc -n ci`; `kubectl logs -n kube-system ds/ebs-csi-node`; `aws ec2 describe-volumes --filters Name=tag:kubernetes.io/created-for/pvc/name,Values=jenkins`.
+
+## Troubleshooting playbook
+- Terraform backend/state: S3 access denied → verify IAM + bucket names; `terraform init -reconfigure`; Dynamo lock stuck → `terraform force-unlock <id>` only after confirming no active run.
+- EKS access/kubeconfig: rerun `aws eks update-kubeconfig --name platform-dev-eks --region ap-south-1`; confirm `aws sts get-caller-identity`.
+- ALB Controller: ALB missing → controller logs for IAM/SG/subnet tag errors; ensure IRSA annotation uses output ARN; subnets tagged for elb/internal.
+- ExternalDNS: Records missing → logs show “no hosted zone” or AccessDenied; ensure `domainFilters` matches `poc.<ROOT_DOMAIN>` and NS delegation is correct; txtOwnerId consistent.
+- ACM/cert: Pending → validate DNS CNAME exists in zone; wait a few minutes.
+- Ingress/ALB health: Target group unhealthy → check service ports and readiness; ensure `alb.ingress.kubernetes.io/target-type=ip` and pods in private subnets.
+- Jenkins PVC: Pending → confirm StorageClass gp3 exists; EBS CSI controller/node pods ready; IAM role annotation correct.
+- IRSA: Pods failing AWS API access → `kubectl describe sa <name> -n kube-system` to verify annotation; ensure OIDC provider present and trust policy subject matches service account.

@@ -1,0 +1,12 @@
+clusterName: ${NAME_PREFIX}-${ENVIRONMENT}-eks
+region: ${AWS_REGION}
+vpcId: ${VPC_ID}
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: ${ALB_CONTROLLER_IAM_ROLE_ARN}
+
+enableShield: false
+enableWaf: false

@@ -1,0 +1,15 @@
+provider: aws
+registry: txt
+txtOwnerId: ${EXTERNALDNS_TXT_OWNER_ID}
+policy: upsert-only
+domainFilters:
+  - poc.${ROOT_DOMAIN}
+serviceAccount:
+  create: true
+  name: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: ${EXTERNALDNS_IAM_ROLE_ARN}
+sources:
+  - ingress
+metrics:
+  enabled: true

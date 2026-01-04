@@ -1,0 +1,14 @@
+controller:
+  serviceAccount:
+    create: true
+    name: ebs-csi-controller-sa
+    annotations:
+      eks.amazonaws.com/role-arn: ${EBS_CSI_IAM_ROLE_ARN}
+storageClasses:
+  - name: gp3
+    annotations:
+      storageclass.kubernetes.io/is-default-class: "true"
+    parameters:
+      type: gp3
+      fsType: ext4
+      encrypted: "true"
