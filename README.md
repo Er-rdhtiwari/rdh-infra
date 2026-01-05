@@ -47,6 +47,8 @@ scripts/30_addons_install.sh
 ### 4) Install Jenkins
 ```
 scripts/40_jenkins_install.sh
+# If error then run below one and rerun above one
+helm uninstall jenkins -n ci
 ```
 - Admin creds stored in `jenkins-admin` secret; hostname `jenkins.poc.<ROOT_DOMAIN>` with HTTPS (ALB + ACM).
 
@@ -54,6 +56,11 @@ scripts/40_jenkins_install.sh
 ```
 scripts/50_verify_platform.sh
 ```
+- Nodes: `aws eks update-kubeconfig --name ${NAME_PREFIX}-${ENVIRONMENT}-eks --region ${AWS_REGION} && kubectl get nodes -o wide`
+- Addons: `kubectl get pods -n kube-system -l 'app.kubernetes.io/name in (aws-load-balancer-controller,external-dns,aws-ebs-csi-driver)'`
+- Jenkins: `kubectl get pods,svc,ingress,pvc -n ci`
+- DNS/ALB: `kubectl describe ingress jenkins -n ci`, `dig +short jenkins.poc.${ROOT_DOMAIN}`, `curl -kI https://jenkins.poc.${ROOT_DOMAIN}`
+- Cert: `aws acm describe-certificate --certificate-arn $ACM_CERT_ARN | jq .Certificate.Status` (expect ISSUED)
 
 - Install metrics-server (for `kubectl top`):
 ```
@@ -140,7 +147,47 @@ Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_p
 
 ### 7) Destroy
 - Single PoC: `POC_ID=demo1 scripts/95_destroy_poc.sh`
+- Find PoC IDs (release name == POC_ID):
+  ```
+  helm list -A
+  kubectl get ns | grep '^poc-'
+  kubectl get ingress -A
+  ```
+- Destroy a PoC: `POC_ID=<id> scripts/95_destroy_poc.sh`
 - Everything: `scripts/90_destroy_all.sh` (uninstalls Jenkins/addons, terraform destroy platform then bootstrap).
+- If Terraform prompts for vars during destroy, supply the same values as in your `.env`.
+- Alternative manual destroys (from repo root):
+  ```
+  # Platform destroy
+  cd platform
+  terraform destroy -auto-approve \
+    -var="aws_region=${AWS_REGION}" \
+    -var="name_prefix=${NAME_PREFIX}" \
+    -var="environment=${ENVIRONMENT}" \
+    -var="root_domain=${ROOT_DOMAIN}" \
+    -var="vpc_cidr=${VPC_CIDR}" \
+    -var="public_subnet_cidrs=${PUBLIC_SUBNET_CIDRS}" \
+    -var="private_subnet_cidrs=${PRIVATE_SUBNET_CIDRS}" \
+    -var="kubernetes_version=${K8S_VERSION}" \
+    -var="node_instance_types=${NODE_INSTANCE_TYPES}" \
+    -var="node_min_size=${NODE_MIN_SIZE}" \
+    -var="node_max_size=${NODE_MAX_SIZE}" \
+    -var="node_desired_size=${NODE_DESIRED_SIZE}" \
+    -var="externaldns_txt_owner_id=${EXTERNALDNS_TXT_OWNER_ID}"
+  cd ..
+
+  # Bootstrap destroy
+  cd bootstrap
+  terraform destroy -auto-approve \
+    -var="aws_region=${AWS_REGION}" \
+    -var="name_prefix=${NAME_PREFIX}" \
+    -var="environment=${ENVIRONMENT}" \
+    -var="root_domain=${ROOT_DOMAIN}" \
+    -var="create_subdomain_zone=${CREATE_SUBDOMAIN_ZONE}" \
+    -var="tf_state_bucket=${TF_STATE_BUCKET}" \
+    -var="tf_lock_table=${TF_STATE_DYNAMO_TABLE}"
+  cd ..
+  ```
 
 ## Cost control
 - Nodegroup is single ASG with min=1; adjust to 0 for idle via Terraform var `node_min_size`.
@@ -149,10 +196,13 @@ Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_p
 - Use `scripts/90_destroy_all.sh` for full teardown.
 
 ## Debug checklist highlights
-- State issues: check S3/Dynamo + `terraform state pull`.
-- Cluster access: `aws eks update-kubeconfig --name <cluster>`.
-- ALB/DNS: ensure ALB controller/ExternalDNS pods ready; inspect events.
-- Cert: ACM must be “Issued”; ALB listener uses correct cert ARN.
+- Identity: `aws sts get-caller-identity`; context: `kubectl config current-context`.
+- State issues: `terraform state pull`; check S3/Dynamo exist.
+- Cluster access: `aws eks update-kubeconfig --name <cluster> --region <region>`; `kubectl get nodes`.
+- Events: `kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -n 30`.
+- ALB/DNS: `kubectl get ingress -A`; `kubectl describe ingress <name> -n <ns>`; ExternalDNS logs `kubectl logs -n kube-system deploy/external-dns --tail=50`; ALB controller logs `kubectl logs -n kube-system deploy/aws-load-balancer-controller --tail=50`; DNS `dig +short <host>`.
+- Cert: `aws acm describe-certificate --certificate-arn $ACM_CERT_ARN | jq .Certificate.Status`.
+- PVC: `kubectl get pvc -A`; if Pending, `kubectl describe pvc <name> -n <ns>` and ensure a node exists in the PV’s AZ.
 
 ## Versions
 - Terraform: >=1.6
