@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Preserve any user-provided PoC vars so .env (which may have blank defaults) does not clobber them.
+USER_POC_ID="${POC_ID-}"
+USER_POC_HELM_REPO="${POC_HELM_REPO-}"
+USER_POC_HELM_REPO_NAME="${POC_HELM_REPO_NAME-}"
+USER_POC_HELM_CHART="${POC_HELM_CHART-}"
+USER_POC_HELM_VERSION="${POC_HELM_VERSION-}"
+USER_POC_HELM_EXTRA_ARGS="${POC_HELM_EXTRA_ARGS-}"
+USER_POC_HELM_VALUES_FILES="${POC_HELM_VALUES_FILES-}"
+USER_POC_NAMESPACE_PREFIX="${POC_NAMESPACE_PREFIX-}"
+
+set -a
 source .env
+set +a
+
+# Reapply user-provided PoC vars if set
+[ -n "${USER_POC_ID}" ] && POC_ID="$USER_POC_ID"
+[ -n "${USER_POC_HELM_REPO}" ] && POC_HELM_REPO="$USER_POC_HELM_REPO"
+[ -n "${USER_POC_HELM_REPO_NAME}" ] && POC_HELM_REPO_NAME="$USER_POC_HELM_REPO_NAME"
+[ -n "${USER_POC_HELM_CHART}" ] && POC_HELM_CHART="$USER_POC_HELM_CHART"
+[ -n "${USER_POC_HELM_VERSION}" ] && POC_HELM_VERSION="$USER_POC_HELM_VERSION"
+[ -n "${USER_POC_HELM_EXTRA_ARGS}" ] && POC_HELM_EXTRA_ARGS="$USER_POC_HELM_EXTRA_ARGS"
+[ -n "${USER_POC_HELM_VALUES_FILES}" ] && POC_HELM_VALUES_FILES="$USER_POC_HELM_VALUES_FILES"
+[ -n "${USER_POC_NAMESPACE_PREFIX}" ] && POC_NAMESPACE_PREFIX="$USER_POC_NAMESPACE_PREFIX"
 
 : "${POC_ID:?set POC_ID}"
 : "${POC_HELM_REPO:?set POC_HELM_REPO}"
@@ -67,3 +90,23 @@ helm upgrade --install "${POC_ID}" "${POC_HELM_CHART}" \
   --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/scheme"=internet-facing \
   --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/target-type"=ip \
   ${EXTRA_ARGS}
+
+cat <<EOF
+[ok] PoC deployed.
+- POC_ID: ${POC_ID}
+- Namespace: ${NS}
+- Host: https://${HOST}
+- Helm release: ${POC_ID} (repo ${POC_HELM_REPO_NAME}, chart ${POC_HELM_CHART}, version ${POC_HELM_VERSION})
+- Extra args: ${EXTRA_ARGS:-<none>}
+
+Quick checks:
+  kubectl get pods -n ${NS}
+  kubectl get ingress -n ${NS}
+  kubectl describe ingress ${POC_ID} -n ${NS}
+  kubectl get targetgroupbinding -n ${NS}
+  dig +short ${HOST}
+  curl -kI https://${HOST}
+
+If ingress ADDRESS is empty, wait a minute and check ALB controller logs:
+  kubectl logs -n kube-system deploy/aws-load-balancer-controller --tail=50
+EOF
