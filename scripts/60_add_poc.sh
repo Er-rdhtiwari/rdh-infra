@@ -38,8 +38,10 @@ VALUES_FILES="${POC_HELM_VALUES_FILES:-}"
 NS="${POC_NAMESPACE_PREFIX}-${POC_ID}"
 HOST="${POC_ID}.poc.${ROOT_DOMAIN}"
 
+echo "[info] Creating/updating namespace ${NS}"
 kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
+echo "[info] Applying quota/limits in ${NS}"
 cat <<EOF2 | kubectl apply -f -
 apiVersion: v1
 kind: ResourceQuota
@@ -67,6 +69,7 @@ spec:
     type: Container
 EOF2
 
+echo "[info] Helm repo add/update: ${POC_HELM_REPO_NAME} -> ${POC_HELM_REPO}"
 helm repo add "$POC_HELM_REPO_NAME" "$POC_HELM_REPO"
 helm repo update
 
@@ -75,34 +78,30 @@ cmd=(helm upgrade --install "${POC_ID}" "${POC_HELM_CHART}"
   --version "${POC_HELM_VERSION}"
 )
 
+helm_cmd="helm upgrade --install ${POC_ID} ${POC_HELM_CHART} --namespace ${NS} --create-namespace=false --version ${POC_HELM_VERSION}"
+
 if [ -n "$VALUES_FILES" ]; then
   IFS=',' read -r -a files <<< "$VALUES_FILES"
   for f in "${files[@]}"; do
-    cmd+=(-f "$f")
+    helm_cmd+=" -f \"$f\""
   done
 fi
 
-cmd+=(
-  --set ingress.enabled=true
-  --set ingress.className=alb
-  --set ingress.hosts[0].host="${HOST}"
-  --set ingress.hosts[0].paths[0].path="/"
-  --set ingress.hosts[0].paths[0].pathType=Prefix
-  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/scheme"=internet-facing
-  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/target-type"=ip
-)
+helm_cmd+=" --set ingress.enabled=true"
+helm_cmd+=" --set ingress.className=alb"
+helm_cmd+=" --set ingress.hosts[0].host=${HOST}"
+helm_cmd+=" --set ingress.hosts[0].paths[0].path=/"
+helm_cmd+=" --set ingress.hosts[0].paths[0].pathType=Prefix"
+helm_cmd+=" --set ingress.annotations.alb\\.ingress\\.kubernetes\\.io/scheme=internet-facing"
+helm_cmd+=" --set ingress.annotations.alb\\.ingress\\.kubernetes\\.io/target-type=ip"
 
 if [ -n "$EXTRA_ARGS" ]; then
-  # shellcheck disable=SC2206
-  extra_split=($EXTRA_ARGS)
-  cmd+=("${extra_split[@]}")
+  helm_cmd+=" ${EXTRA_ARGS}"
 fi
 
 echo "[info] Running helm command:"
-printf ' %q' "${cmd[@]}"
-echo
-
-"${cmd[@]}"
+echo " $helm_cmd"
+eval "$helm_cmd"
 
 cat <<EOF
 [ok] PoC deployed.

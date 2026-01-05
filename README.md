@@ -88,7 +88,7 @@ Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_p
   export POC_HELM_EXTRA_ARGS="--set ui.message='GitHub: <a href=\"https://github.com/Er-rdhtiwari\" target=\"_blank\">Er-rdhtiwari</a>' --set ui.color=teal"
   scripts/60_add_poc.sh
   ```
-- **Minimal todo PoC** (public sample chart):  
+- **Minimal todo PoC** (public sample chart):
   ```
   export POC_ID=todo
   export POC_HELM_REPO=https://dapr.github.io/helm-charts
@@ -99,6 +99,16 @@ Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_p
   scripts/60_add_poc.sh
   ```
   (Replace with your own chart if you have a preferred todo app image; use `POC_HELM_VALUES_FILES` to supply custom values.)
+- **Habitify app** (build + deploy from repo `Er-rdhtiwari/habitify` using its Helm chart):
+  - Requires `.env` with `ROOT_DOMAIN`, docker CLI, and an image registry you can push to.
+  - From repo root:
+  ```
+  ./add-poc/add_poc_habitify.sh IMAGE_REPO=<registry>/habitify IMAGE_TAG=latest \
+    POC_ID=habitify POC_NAMESPACE_PREFIX=poc \
+    HABITIFY_BUILD_IMAGE=true HABITIFY_PUSH_IMAGE=true
+  ```
+  - Defaults: clones to `/tmp/habitify`, builds/pushes image, deploys chart with ALB ingress at `habitify.poc.<ROOT_DOMAIN>`.
+  - Use `-h` for help and more overrides (e.g., clone dir, git URL, build/push toggles).
 
 ### 7) Destroy
 - Single PoC: `POC_ID=demo1 scripts/95_destroy_poc.sh`
