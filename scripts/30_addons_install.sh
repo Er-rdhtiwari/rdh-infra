@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Export all .env entries so envsubst sees them
+set -a
 source .env
+set +a
 
 required=(VPC_ID ALB_CONTROLLER_IAM_ROLE_ARN EXTERNALDNS_IAM_ROLE_ARN EBS_CSI_IAM_ROLE_ARN AWS_REGION NAME_PREFIX ENVIRONMENT ROOT_DOMAIN EXTERNALDNS_TXT_OWNER_ID)
 for v in "${required[@]}"; do
