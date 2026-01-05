@@ -63,6 +63,42 @@ POC_HELM_REPO_NAME=demo POC_HELM_CHART=demo/app POC_HELM_VERSION=1.2.3 \
 scripts/60_add_poc.sh
 ```
 - Namespace `poc-demo1`, quota/limits applied, ingress host `demo1.poc.<ROOT_DOMAIN>` (ExternalDNS + ALB).
+- Optional knobs for PoCs:
+  - `POC_HELM_EXTRA_ARGS`: extra flags passed to `helm upgrade` (e.g., `--set ui.message='Hello'`).
+  - `POC_HELM_VALUES_FILES`: comma-separated list of values files to `-f` into the release.
+
+Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_poc.sh`):
+- **Resume link** (podinfo with CTA):  
+  ```
+  export POC_ID=resume
+  export POC_HELM_REPO=https://stefanprodan.github.io/podinfo
+  export POC_HELM_REPO_NAME=podinfo
+  export POC_HELM_CHART=podinfo
+  export POC_HELM_VERSION=6.4.0
+  export POC_HELM_EXTRA_ARGS="--set replicaCount=1 --set ui.message='Resume: <a href=\"https://docs.google.com/document/d/1SXkMZZASwy2cdoBDVELRP8x80uGiPAxN/edit?usp=sharing&ouid=101849102496826439629&rtpof=true&sd=true\" target=\"_blank\">Open</a>' --set ui.color=indigo"
+  scripts/60_add_poc.sh
+  ```
+- **GitHub profile link** (podinfo message to your GitHub README):  
+  ```
+  export POC_ID=github
+  export POC_HELM_REPO=https://stefanprodan.github.io/podinfo
+  export POC_HELM_REPO_NAME=podinfo
+  export POC_HELM_CHART=podinfo
+  export POC_HELM_VERSION=6.4.0
+  export POC_HELM_EXTRA_ARGS="--set ui.message='GitHub: <a href=\"https://github.com/Er-rdhtiwari\" target=\"_blank\">Er-rdhtiwari</a>' --set ui.color=teal"
+  scripts/60_add_poc.sh
+  ```
+- **Minimal todo PoC** (public sample chart):  
+  ```
+  export POC_ID=todo
+  export POC_HELM_REPO=https://dapr.github.io/helm-charts
+  export POC_HELM_REPO_NAME=dapr
+  export POC_HELM_CHART=sample
+  export POC_HELM_VERSION=1.10.0
+  export POC_HELM_EXTRA_ARGS="--set service.type=ClusterIP --set ingress.enabled=true --set ingress.className=alb --set ingress.hosts[0]=todo.poc.${ROOT_DOMAIN}"
+  scripts/60_add_poc.sh
+  ```
+  (Replace with your own chart if you have a preferred todo app image; use `POC_HELM_VALUES_FILES` to supply custom values.)
 
 ### 7) Destroy
 - Single PoC: `POC_ID=demo1 scripts/95_destroy_poc.sh`
