@@ -2,6 +2,14 @@
 set -euo pipefail
 source .env
 
+required=(VPC_ID ALB_CONTROLLER_IAM_ROLE_ARN EXTERNALDNS_IAM_ROLE_ARN EBS_CSI_IAM_ROLE_ARN AWS_REGION NAME_PREFIX ENVIRONMENT ROOT_DOMAIN EXTERNALDNS_TXT_OWNER_ID)
+for v in "${required[@]}"; do
+  if [ -z "${!v:-}" ]; then
+    echo "[error] Missing required env var: $v (set it in .env from platform outputs)"
+    exit 1
+  fi
+done
+
 kubectl get nodes >/dev/null
 
 render() {
