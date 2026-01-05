@@ -5,7 +5,7 @@ set -euo pipefail
 # Runs scripts/60_add_poc.sh with the env vars you listed.
 # You can override any value by exporting it before running this script.
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ ! -f "$REPO_ROOT/scripts/60_add_poc.sh" ]]; then
   echo "ERROR: $REPO_ROOT/scripts/60_add_poc.sh not found."
