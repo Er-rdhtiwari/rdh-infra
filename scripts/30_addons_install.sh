@@ -5,8 +5,11 @@ source .env
 kubectl get nodes >/dev/null
 
 render() {
-  envsubst < "$1" > "/tmp/$(basename "$1")"
-  echo "/tmp/$(basename "$1")"
+  local src="$1"
+  local tmp
+  tmp=$(mktemp "/tmp/$(basename "${src%.yaml}")-XXXXXX.yaml")
+  envsubst < "$src" > "$tmp"
+  echo "$tmp"
 }
 
 ALB_VALUES=$(render helm/aws-load-balancer-controller/values.yaml)
