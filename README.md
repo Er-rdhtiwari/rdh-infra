@@ -55,6 +55,13 @@ scripts/40_jenkins_install.sh
 scripts/50_verify_platform.sh
 ```
 
+- Install metrics-server (for `kubectl top`):
+```
+scripts/55_install_metrics_server.sh
+kubectl top nodes
+kubectl top pods -A
+```
+
 ### 6) Add a PoC
 Example (Helm chart from repo):
 ```
