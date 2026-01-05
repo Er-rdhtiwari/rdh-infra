@@ -16,24 +16,27 @@ controller:
     - configuration-as-code:1813.v7b_b_0f25689d1
   serviceType: ClusterIP
   jenkinsUrl: "https://jenkins.poc.${ROOT_DOMAIN}"
-ingress:
-  enabled: true
-  apiVersion: networking.k8s.io/v1
-  ingressClassName: alb
-  hostName: jenkins.poc.${ROOT_DOMAIN}
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERT_ARN}
-  paths:
-    - path: /
-      pathType: Prefix
-persistence:
-  enabled: true
-  storageClass: gp3
-  size: ${JENKINS_STORAGE_SIZE}
+  # Ingress configuration lives under controller.ingress per chart defaults
+  ingress:
+    enabled: true
+    apiVersion: networking.k8s.io/v1
+    ingressClassName: alb
+    hostName: jenkins.poc.${ROOT_DOMAIN}
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERT_ARN}
+    paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jenkins
+            port:
+              number: 8080
+
 persistence:
   enabled: true
   storageClass: gp3
