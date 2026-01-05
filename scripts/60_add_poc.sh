@@ -98,6 +98,10 @@ if [ -n "$EXTRA_ARGS" ]; then
   cmd+=("${extra_split[@]}")
 fi
 
+echo "[info] Running helm command:"
+printf ' %q' "${cmd[@]}"
+echo
+
 "${cmd[@]}"
 
 cat <<EOF
