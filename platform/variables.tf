@@ -12,5 +12,9 @@ variable "node_instance_types" { type = string }
 variable "node_min_size" { type = number }
 variable "node_max_size" { type = number }
 variable "node_desired_size" { type = number }
+variable "node_ami_type" {
+  type    = string
+  default = "AL2023_x86_64_STANDARD"
+}
 
 variable "externaldns_txt_owner_id" { type = string }
