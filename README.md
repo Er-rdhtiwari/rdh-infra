@@ -23,7 +23,7 @@
 5) PoC onboarding via namespace, quota, Helm chart, ingress host `<id>.poc.<ROOT_DOMAIN>`.
 
 ## Environment
-Copy `.env.example` to `.env` and adjust. After `scripts/10_bootstrap_apply.sh`, update `TF_STATE_BUCKET` / `TF_STATE_DYNAMO_TABLE` to match the outputs (bucket is `${NAME_PREFIX}-${ENVIRONMENT}-tf-state`, table is `${NAME_PREFIX}-${ENVIRONMENT}-tf-lock`). After `scripts/20_platform_apply.sh`, copy Terraform outputs (VPC ID, IAM role ARNs, ACM cert ARN) back into `.env` so Helm value rendering works.
+Copy `.env.example` to `.env` and adjust. If a bucket/table already exist or you want custom names, set `TF_STATE_BUCKET` / `TF_STATE_DYNAMO_TABLE` before bootstrapping; otherwise leave them blank to let bootstrap create `${NAME_PREFIX}-${ENVIRONMENT}-tf-state` and `${NAME_PREFIX}-${ENVIRONMENT}-tf-lock`. After `scripts/10_bootstrap_apply.sh`, update `TF_STATE_BUCKET` / `TF_STATE_DYNAMO_TABLE` to match the outputs. After `scripts/20_platform_apply.sh`, copy Terraform outputs (VPC ID, IAM role ARNs, ACM cert ARN) back into `.env` so Helm value rendering works.
 
 ## Step-by-step
 ### 1) Bootstrap state + subdomain

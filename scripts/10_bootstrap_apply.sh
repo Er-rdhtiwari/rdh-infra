@@ -9,4 +9,6 @@ terraform apply -auto-approve \
   -var="name_prefix=${NAME_PREFIX}" \
   -var="environment=${ENVIRONMENT}" \
   -var="root_domain=${ROOT_DOMAIN}" \
-  -var="create_subdomain_zone=${CREATE_SUBDOMAIN_ZONE}"
+  -var="create_subdomain_zone=${CREATE_SUBDOMAIN_ZONE}" \
+  -var="tf_state_bucket=${TF_STATE_BUCKET}" \
+  -var="tf_lock_table=${TF_STATE_DYNAMO_TABLE}"
