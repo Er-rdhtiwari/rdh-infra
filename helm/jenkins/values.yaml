@@ -9,11 +9,11 @@ controller:
     userKey: user
     passwordKey: password
   installPlugins:
-    - kubernetes:4203.v1dd44f5b_1cf9
-    - workflow-aggregator:596.v8c21c963d92d
-    - git:5.2.1
-    - job-dsl:1.87
-    - configuration-as-code:1813.v7b_b_0f25689d1
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - job-dsl
+    - configuration-as-code
   serviceType: ClusterIP
   jenkinsUrl: "https://jenkins.poc.${ROOT_DOMAIN}"
   # Ingress configuration lives under controller.ingress per chart defaults
