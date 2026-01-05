@@ -1,5 +1,9 @@
 controller:
-  image: "jenkins/jenkins"
+  image:
+    registry: docker.io
+    repository: jenkins/jenkins
+    tag: lts-jdk17
+    pullPolicy: IfNotPresent
   admin:
     existingSecret: jenkins-admin
     userKey: user

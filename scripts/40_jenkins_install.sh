@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Export .env vars so envsubst sees them
+set -a
 source .env
+set +a
 
 kubectl create namespace ci --dry-run=client -o yaml | kubectl apply -f -
 
