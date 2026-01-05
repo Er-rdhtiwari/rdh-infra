@@ -76,14 +76,16 @@ set +a
 [ -n "$USER_BUILD_IMAGE" ] && HABITIFY_BUILD_IMAGE="$USER_BUILD_IMAGE"
 [ -n "$USER_PUSH_IMAGE" ] && HABITIFY_PUSH_IMAGE="$USER_PUSH_IMAGE"
 
+# Default to your ECR image if none provided
+IMAGE_REPO="${IMAGE_REPO:-253484721204.dkr.ecr.us-east-1.amazonaws.com/habitify}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+
 if [ -z "${IMAGE_REPO:-}" ] || [ -z "${IMAGE_TAG:-}" ]; then
   cat >&2 <<'EOF'
 [error] IMAGE_REPO and IMAGE_TAG are required.
 Example:
-  export IMAGE_REPO=<your-registry>/habitify
-  export IMAGE_TAG=latest
+  ./add-poc/add_poc_habitify.sh IMAGE_REPO=<registry>/habitify IMAGE_TAG=latest
   # optional: POC_ID=habitify POC_NAMESPACE_PREFIX=poc HABITIFY_CLONE_DIR=/tmp/habitify HABITIFY_GIT_URL=...
-  ./add-poc/add_poc_habitify.sh
 EOF
   exit 1
 fi

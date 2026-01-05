@@ -62,6 +62,27 @@ kubectl top nodes
 kubectl top pods -A
 ```
 
+- To “destroy” what you applied from that URL, delete the same manifest.
+
+```bash
+kubectl delete -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+Then verify it’s gone:
+
+```bash
+kubectl get pods -n kube-system | grep metrics-server || true
+kubectl api-resources | grep metrics.k8s.io || true
+```
+
+If it doesn’t delete cleanly, force-remove the namespace objects (rare):
+
+```bash
+kubectl delete deployment metrics-server -n kube-system --ignore-not-found
+kubectl delete service metrics-server -n kube-system --ignore-not-found
+kubectl delete apiservice v1beta1.metrics.k8s.io --ignore-not-found
+```
+
 ### 6) Add a PoC
 Example (Helm chart from repo):
 ```

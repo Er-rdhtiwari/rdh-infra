@@ -17,3 +17,10 @@ echo "[info] kubectl top pods -A:"
 kubectl top pods -A || echo "[warn] metrics not available yet; wait a bit more and retry 'kubectl top pods -A'"
 
 echo "[ok] metrics-server install attempted."
+
+
+# To “destroy” what you applied from that URL, delete the same manifest.
+# kubectl delete -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+# Then verify it’s gone:
+# kubectl get pods -n kube-system | grep metrics-server || true
+#kubectl api-resources | grep metrics.k8s.io || true
