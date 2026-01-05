@@ -156,6 +156,7 @@ Sample POCs (no code changes needed, just set env vars and run `scripts/60_add_p
 - Destroy a PoC: `POC_ID=<id> scripts/95_destroy_poc.sh`
 - Everything: `scripts/90_destroy_all.sh` (uninstalls Jenkins/addons, terraform destroy platform then bootstrap).
 - If Terraform prompts for vars during destroy, supply the same values as in your `.env`.
+- Verify deletion: `scripts/99_verify_destroy.sh` (checks EKS cluster/nodegroups, tagged VPCs, tfstate bucket/table, hosted zone, ALBs).
 - Alternative manual destroys (from repo root):
   ```
   # Platform destroy
