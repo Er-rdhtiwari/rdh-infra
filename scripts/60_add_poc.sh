@@ -70,26 +70,35 @@ EOF2
 helm repo add "$POC_HELM_REPO_NAME" "$POC_HELM_REPO"
 helm repo update
 
-VALUES_FLAGS=()
+cmd=(helm upgrade --install "${POC_ID}" "${POC_HELM_CHART}"
+  --namespace "$NS" --create-namespace=false
+  --version "${POC_HELM_VERSION}"
+)
+
 if [ -n "$VALUES_FILES" ]; then
   IFS=',' read -r -a files <<< "$VALUES_FILES"
   for f in "${files[@]}"; do
-    VALUES_FLAGS+=(-f "$f")
+    cmd+=(-f "$f")
   done
 fi
 
-helm upgrade --install "${POC_ID}" "${POC_HELM_CHART}" \
-  --namespace "$NS" --create-namespace=false \
-  --version "${POC_HELM_VERSION}" \
-  "${VALUES_FLAGS[@]}" \
-  --set ingress.enabled=true \
-  --set ingress.className=alb \
-  --set ingress.hosts[0].host="${HOST}" \
-  --set ingress.hosts[0].paths[0].path="/" \
-  --set ingress.hosts[0].paths[0].pathType=Prefix \
-  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/scheme"=internet-facing \
-  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/target-type"=ip \
-  ${EXTRA_ARGS}
+cmd+=(
+  --set ingress.enabled=true
+  --set ingress.className=alb
+  --set ingress.hosts[0].host="${HOST}"
+  --set ingress.hosts[0].paths[0].path="/"
+  --set ingress.hosts[0].paths[0].pathType=Prefix
+  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/scheme"=internet-facing
+  --set ingress.annotations."alb\\.ingress\\.kubernetes\\.io/target-type"=ip
+)
+
+if [ -n "$EXTRA_ARGS" ]; then
+  # shellcheck disable=SC2206
+  extra_split=($EXTRA_ARGS)
+  cmd+=("${extra_split[@]}")
+fi
+
+"${cmd[@]}"
 
 cat <<EOF
 [ok] PoC deployed.
