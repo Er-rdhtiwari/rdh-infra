@@ -83,7 +83,7 @@ scripts/60_add_poc.sh
 ## Versions
 - Terraform: >=1.6
 - AWS provider: ~> 5.46
-- Helm charts: ALB controller 1.8.2, ExternalDNS 1.14.4, EBS CSI driver 2.30.0, Jenkins 5.6.1
+- Helm charts: ALB controller 1.8.2, ExternalDNS 1.16.1, EBS CSI driver 2.30.0, Jenkins 5.6.1
 - EKS Kubernetes version default: 1.28 (override via var)
 
 ## Architecture (short)
